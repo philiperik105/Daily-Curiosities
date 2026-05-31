@@ -67,19 +67,23 @@ def youtube_id(url: str) -> str | None:
 
 
 def fetch_thumbnail_b64(vid: str) -> str | None:
-    """Download YouTube thumbnail and return as base64 data URI."""
-    for quality in ["maxresdefault", "hqdefault", "mqdefault"]:
-        try:
-            url = f"https://img.youtube.com/vi/{vid}/{quality}.jpg"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = resp.read()
-                if len(data) > 1000:  # skip tiny placeholder images
-                    b64 = base64.b64encode(data).decode()
-                    return f"data:image/jpeg;base64,{b64}"
-        except Exception:
-            continue
-    return None
+    """Fetch thumbnail via oEmbed API, then download and embed as base64."""
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid}&format=json"
+        req = urllib.request.Request(oembed_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            thumb_url = data.get("thumbnail_url")
+        if not thumb_url:
+            return None
+        req2 = urllib.request.Request(thumb_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req2, timeout=10) as resp2:
+            img_data = resp2.read()
+            b64 = base64.b64encode(img_data).decode()
+            return f"data:image/jpeg;base64,{b64}"
+    except Exception as e:
+        print(f"Thumbnail fetch failed for {vid}: {e}")
+        return None
 
 
 def build_html(topics: list[dict], date_str: str) -> str:
