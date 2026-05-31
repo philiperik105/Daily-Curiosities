@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Daily curiosity feed — generates an HTML page + sends Pushover notification."""
 
+import base64
 import json
 import os
 import re
@@ -54,7 +55,6 @@ def fetch_topics() -> list[dict]:
 
 
 def youtube_id(url: str) -> str | None:
-    """Extract YouTube video ID from a URL."""
     patterns = [
         r"youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})",
         r"youtu\.be/([a-zA-Z0-9_-]{11})",
@@ -66,15 +66,33 @@ def youtube_id(url: str) -> str | None:
     return None
 
 
+def fetch_thumbnail_b64(vid: str) -> str | None:
+    """Download YouTube thumbnail and return as base64 data URI."""
+    for quality in ["maxresdefault", "hqdefault", "mqdefault"]:
+        try:
+            url = f"https://img.youtube.com/vi/{vid}/{quality}.jpg"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = resp.read()
+                if len(data) > 1000:  # skip tiny placeholder images
+                    b64 = base64.b64encode(data).decode()
+                    return f"data:image/jpeg;base64,{b64}"
+        except Exception:
+            continue
+    return None
+
+
 def build_html(topics: list[dict], date_str: str) -> str:
     cards = ""
     for i, t in enumerate(topics, 1):
         vid = youtube_id(t["url"])
         if vid:
-            thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
-            img_html = f'<img src="{thumb}" alt="{t["title"]}">'
+            b64 = fetch_thumbnail_b64(vid)
+            if b64:
+                img_html = f'<img src="{b64}" alt="{t["title"]}">'
+            else:
+                img_html = f'<div class="placeholder">▶</div>'
         else:
-            # fallback placeholder for articles
             img_html = f'<div class="placeholder">#{i}</div>'
 
         cards += f"""
@@ -168,11 +186,11 @@ def build_html(topics: list[dict], date_str: str) -> str:
 
 def pushover_notify(message: str, url: str) -> None:
     data = urllib.parse.urlencode({
-        "token":   PUSHOVER_APP_TOKEN,
-        "user":    PUSHOVER_USER_KEY,
-        "title":   "Today's 5 Curiosities",
-        "message": message,
-        "url":     url,
+        "token":     PUSHOVER_APP_TOKEN,
+        "user":      PUSHOVER_USER_KEY,
+        "title":     "Today's 5 Curiosities",
+        "message":   message,
+        "url":       url,
         "url_title": "Open all 5 →",
     }).encode()
     req = urllib.request.Request("https://api.pushover.net/1/messages.json", data=data)
