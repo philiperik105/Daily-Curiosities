@@ -5,6 +5,9 @@ on:
     - cron: '0 19 * * *'   # every day at 21:00 Oslo time (UTC+2 summer / UTC+1 winter)
   workflow_dispatch:         # allows manual trigger from GitHub UI
 
+permissions:
+  contents: write
+
 jobs:
   send-curiosities:
     runs-on: ubuntu-latest
@@ -23,4 +26,13 @@ jobs:
           ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           PUSHOVER_USER_KEY:  ${{ secrets.PUSHOVER_USER_KEY }}
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PAGES_URL:          https://philiperik105.github.io/Daily-Curiosities/
         run: python daily_topics.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '.github,daily_topics.py,*.log'
