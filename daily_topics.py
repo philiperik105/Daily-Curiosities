@@ -27,13 +27,14 @@ unusual linguistics, forgotten inventions, extreme geography, etc.
 For each topic return:
 - A short punchy title (≤ 8 words)
 - One sentence explaining why it's interesting
-- A YouTube search query (3-6 words, specific enough to find great videos)
-- A real article URL (no paywalls — use Wikipedia, BBC, Smithsonian, Atlas Obscura, etc.)
+- A specific real YouTube video URL that you are confident exists and is about this topic
+- A specific real article URL from a quality source like BBC, Smithsonian, National Geographic,
+  Atlas Obscura, The Guardian, Scientific American, or similar — NO Wikipedia
 - A single relevant emoji
 
 Return ONLY valid JSON in this exact shape, nothing else:
 [
-  {{"title": "...", "why": "...", "yt_query": "...", "article_url": "https://...", "emoji": "🌊"}},
+  {{"title": "...", "why": "...", "yt_url": "https://www.youtube.com/watch?v=...", "article_url": "https://...", "emoji": "🌊"}},
   ...
 ]
 """.strip()
@@ -42,8 +43,8 @@ Return ONLY valid JSON in this exact shape, nothing else:
 def fetch_topics() -> list[dict]:
     client = anthropic.Anthropic()
     response = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=1024,
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
         messages=[{"role": "user", "content": PROMPT}],
     )
     text = response.content[0].text.strip()
@@ -52,11 +53,6 @@ def fetch_topics() -> list[dict]:
         if text.startswith("json"):
             text = text[4:]
     return json.loads(text.strip())
-
-
-def yt_search_url(query: str) -> str:
-    # Use Google search to avoid YouTube app hijacking the link
-    return "https://www.google.com/search?q=" + urllib.parse.quote(query + " youtube")
 
 
 GRADIENTS = [
@@ -73,8 +69,8 @@ def build_html(topics: list[dict], date_str: str) -> str:
     for i, t in enumerate(topics, 1):
         emoji    = t.get("emoji", "🔍")
         gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
-        yt_url   = yt_search_url(t.get("yt_query", t["title"]))
-        art_url  = t.get("article_url") or "https://en.wikipedia.org/wiki/Special:Search?search=" + urllib.parse.quote(t["title"])
+        yt_url   = t.get("yt_url") or "https://www.google.com/search?q=" + urllib.parse.quote(t["title"] + " youtube")
+        art_url  = t.get("article_url") or "https://www.google.com/search?q=" + urllib.parse.quote(t["title"])
 
         cards += f"""
         <div class="card">
@@ -185,7 +181,7 @@ def main() -> None:
     topics = fetch_topics()
 
     for i, t in enumerate(topics, 1):
-        print(f"{i}. {t['title']}\n   {t['why']}\n   YT: {t.get('yt_query')}\n   Article: {t.get('article_url')}\n")
+        print(f"{i}. {t['title']}\n   {t['why']}\n   YT: {t.get('yt_url')}\n   Article: {t.get('article_url')}\n")
 
     date_str = datetime.utcnow().strftime("%B %d, %Y")
     html = build_html(topics, date_str)
