@@ -3,7 +3,6 @@
 
 import json
 import os
-import re
 import urllib.request
 import urllib.parse
 from datetime import datetime
@@ -28,12 +27,13 @@ unusual linguistics, forgotten inventions, extreme geography, etc.
 For each topic return:
 - A short punchy title (≤ 8 words)
 - One sentence explaining why it's interesting
-- A real YouTube URL (preferred) or a real article URL (no paywalls)
+- A YouTube search query (3-6 words, specific enough to find great videos)
+- A real article URL (no paywalls — use Wikipedia, BBC, Smithsonian, Atlas Obscura, etc.)
 - A single relevant emoji
 
 Return ONLY valid JSON in this exact shape, nothing else:
 [
-  {{"title": "...", "why": "...", "url": "https://...", "emoji": "🌊"}},
+  {{"title": "...", "why": "...", "yt_query": "...", "article_url": "https://...", "emoji": "🌊"}},
   ...
 ]
 """.strip()
@@ -54,6 +54,10 @@ def fetch_topics() -> list[dict]:
     return json.loads(text.strip())
 
 
+def yt_search_url(query: str) -> str:
+    return "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
+
+
 GRADIENTS = [
     "linear-gradient(135deg, #1a1a2e, #16213e)",
     "linear-gradient(135deg, #0d1b2a, #1b4332)",
@@ -66,10 +70,13 @@ GRADIENTS = [
 def build_html(topics: list[dict], date_str: str) -> str:
     cards = ""
     for i, t in enumerate(topics, 1):
-        emoji = t.get("emoji", "🔍")
+        emoji    = t.get("emoji", "🔍")
         gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
+        yt_url   = yt_search_url(t.get("yt_query", t["title"]))
+        art_url  = t.get("article_url", "")
+
         cards += f"""
-        <a class="card" href="{t['url']}" target="_blank">
+        <div class="card">
             <div class="thumb" style="background: {gradient};">
                 <span class="emoji">{emoji}</span>
             </div>
@@ -77,8 +84,12 @@ def build_html(topics: list[dict], date_str: str) -> str:
                 <div class="num">{i}</div>
                 <h2>{t['title']}</h2>
                 <p>{t['why']}</p>
+                <div class="btns">
+                    <a href="{yt_url}" target="_blank" class="btn yt">▶ YouTube</a>
+                    {"" if not art_url else f'<a href="{art_url}" target="_blank" class="btn art">📄 Article</a>'}
+                </div>
             </div>
-        </a>"""
+        </div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -110,49 +121,42 @@ def build_html(topics: list[dict], date_str: str) -> str:
     border-radius: 12px;
     overflow: hidden;
     margin-bottom: 14px;
-    text-decoration: none;
-    color: inherit;
-    transition: background 0.15s;
   }}
-  .card:hover {{ background: #242424; }}
   .thumb {{
     flex-shrink: 0;
     width: 100px;
-    height: 90px;
-    overflow: hidden;
+    min-height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
   }}
-  .emoji {{
-    font-size: 2.8rem;
-  }}
-  .placeholder {{
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    color: #555;
-    font-weight: 700;
-  }}
+  .emoji {{ font-size: 2.8rem; }}
   .info {{
     padding: 12px 14px 12px 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 5px;
+    gap: 6px;
   }}
   .num {{ font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 1px; }}
   h2   {{ font-size: 0.95rem; font-weight: 600; line-height: 1.3; }}
   p    {{ font-size: 0.8rem; color: #aaa; line-height: 1.4; }}
+  .btns {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }}
+  .btn {{
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    text-decoration: none;
+    white-space: nowrap;
+  }}
+  .yt  {{ background: #ff0000; color: #fff; }}
+  .art {{ background: #2a2a2a; color: #ccc; border: 1px solid #444; }}
 </style>
 </head>
 <body>
 <header>
   <h1>Today's Curiosities</h1>
-  <p>{date_str} — tap any card to explore</p>
+  <p>{date_str} — pick YouTube or Article</p>
 </header>
 {cards}
 </body>
@@ -180,7 +184,7 @@ def main() -> None:
     topics = fetch_topics()
 
     for i, t in enumerate(topics, 1):
-        print(f"{i}. {t['title']}\n   {t['why']}\n   {t['url']}\n")
+        print(f"{i}. {t['title']}\n   {t['why']}\n   YT: {t.get('yt_query')}\n   Article: {t.get('article_url')}\n")
 
     date_str = datetime.utcnow().strftime("%B %d, %Y")
     html = build_html(topics, date_str)
