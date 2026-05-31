@@ -55,7 +55,8 @@ def fetch_topics() -> list[dict]:
 
 
 def yt_search_url(query: str) -> str:
-    return "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
+    # Use Google search to avoid YouTube app hijacking the link
+    return "https://www.google.com/search?q=" + urllib.parse.quote(query + " youtube")
 
 
 GRADIENTS = [
@@ -73,7 +74,7 @@ def build_html(topics: list[dict], date_str: str) -> str:
         emoji    = t.get("emoji", "🔍")
         gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
         yt_url   = yt_search_url(t.get("yt_query", t["title"]))
-        art_url  = t.get("article_url", "")
+        art_url  = t.get("article_url") or "https://en.wikipedia.org/wiki/Special:Search?search=" + urllib.parse.quote(t["title"])
 
         cards += f"""
         <div class="card">
@@ -86,7 +87,7 @@ def build_html(topics: list[dict], date_str: str) -> str:
                 <p>{t['why']}</p>
                 <div class="btns">
                     <a href="{yt_url}" target="_blank" class="btn yt">▶ YouTube</a>
-                    {"" if not art_url else f'<a href="{art_url}" target="_blank" class="btn art">📄 Article</a>'}
+                    <a href="{art_url}" target="_blank" class="btn art">📄 Article</a>
                 </div>
             </div>
         </div>"""
