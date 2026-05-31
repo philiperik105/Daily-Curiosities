@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Daily curiosity feed — generates an HTML page + sends Pushover notification."""
 
-import base64
 import json
 import os
 import re
@@ -30,10 +29,11 @@ For each topic return:
 - A short punchy title (≤ 8 words)
 - One sentence explaining why it's interesting
 - A real YouTube URL (preferred) or a real article URL (no paywalls)
+- A single relevant emoji
 
 Return ONLY valid JSON in this exact shape, nothing else:
 [
-  {{"title": "...", "why": "...", "url": "https://..."}},
+  {{"title": "...", "why": "...", "url": "https://...", "emoji": "🌊"}},
   ...
 ]
 """.strip()
@@ -54,54 +54,25 @@ def fetch_topics() -> list[dict]:
     return json.loads(text.strip())
 
 
-def youtube_id(url: str) -> str | None:
-    patterns = [
-        r"youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})",
-        r"youtu\.be/([a-zA-Z0-9_-]{11})",
-    ]
-    for p in patterns:
-        m = re.search(p, url)
-        if m:
-            return m.group(1)
-    return None
-
-
-def fetch_thumbnail_b64(vid: str) -> str | None:
-    """Fetch thumbnail via oEmbed API, then download and embed as base64."""
-    try:
-        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid}&format=json"
-        req = urllib.request.Request(oembed_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-            thumb_url = data.get("thumbnail_url")
-        if not thumb_url:
-            return None
-        req2 = urllib.request.Request(thumb_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req2, timeout=10) as resp2:
-            img_data = resp2.read()
-            b64 = base64.b64encode(img_data).decode()
-            return f"data:image/jpeg;base64,{b64}"
-    except Exception as e:
-        print(f"Thumbnail fetch failed for {vid}: {e}")
-        return None
+GRADIENTS = [
+    "linear-gradient(135deg, #1a1a2e, #16213e)",
+    "linear-gradient(135deg, #0d1b2a, #1b4332)",
+    "linear-gradient(135deg, #2d1b4e, #1a0533)",
+    "linear-gradient(135deg, #1c1c1c, #3a1c1c)",
+    "linear-gradient(135deg, #0a2342, #1a3a5c)",
+]
 
 
 def build_html(topics: list[dict], date_str: str) -> str:
     cards = ""
     for i, t in enumerate(topics, 1):
-        vid = youtube_id(t["url"])
-        if vid:
-            b64 = fetch_thumbnail_b64(vid)
-            if b64:
-                img_html = f'<img src="{b64}" alt="{t["title"]}">'
-            else:
-                img_html = f'<div class="placeholder">▶</div>'
-        else:
-            img_html = f'<div class="placeholder">#{i}</div>'
-
+        emoji = t.get("emoji", "🔍")
+        gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
         cards += f"""
         <a class="card" href="{t['url']}" target="_blank">
-            <div class="thumb">{img_html}</div>
+            <div class="thumb" style="background: {gradient};">
+                <span class="emoji">{emoji}</span>
+            </div>
             <div class="info">
                 <div class="num">{i}</div>
                 <h2>{t['title']}</h2>
@@ -146,15 +117,15 @@ def build_html(topics: list[dict], date_str: str) -> str:
   .card:hover {{ background: #242424; }}
   .thumb {{
     flex-shrink: 0;
-    width: 130px;
+    width: 100px;
     height: 90px;
     overflow: hidden;
-    background: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }}
-  .thumb img {{
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .emoji {{
+    font-size: 2.8rem;
   }}
   .placeholder {{
     width: 100%;
