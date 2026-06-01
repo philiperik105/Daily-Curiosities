@@ -39,7 +39,7 @@ Return ONLY valid JSON in this exact shape, nothing else:
 
 def search_urls(title: str) -> tuple[str, str]:
     q = urllib.parse.quote(title)
-    yt  = f"https://www.youtube.com/search?query={q}"
+    yt  = f"https://m.youtube.com/results?search_query={q}"
     art = f"https://www.google.com/search?q={q}"
     return yt, art
 
