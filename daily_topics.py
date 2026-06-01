@@ -39,10 +39,8 @@ Return ONLY valid JSON in this exact shape, nothing else:
 
 def search_urls(title: str) -> tuple[str, str]:
     q = urllib.parse.quote(title)
-    yt  = f"https://www.youtube.com/results?search_query={q}"
-    art = "https://www.google.com/search?q=" + urllib.parse.quote(
-        f"{title} site:bbc.com OR site:smithsonianmag.com OR site:nationalgeographic.com OR site:atlasobscura.com OR site:theguardian.com OR site:scientificamerican.com"
-    )
+    yt  = f"https://www.youtube.com/search?query={q}"
+    art = f"https://www.google.com/search?q={q}"
     return yt, art
 
 
