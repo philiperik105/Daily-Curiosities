@@ -40,6 +40,27 @@ Return ONLY valid JSON in this exact shape, nothing else:
 """.strip()
 
 
+def url_exists(url: str) -> bool:
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        req.add_header("User-Agent", "Mozilla/5.0")
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status < 400
+    except Exception:
+        return False
+
+
+def validate_urls(topics: list[dict]) -> list[dict]:
+    for t in topics:
+        if t.get("article_url") and not url_exists(t["article_url"]):
+            print(f"  ⚠ Dead article URL for '{t['title']}' — replacing with search")
+            t["article_url"] = "https://www.google.com/search?q=" + urllib.parse.quote(t["title"] + " site:bbc.com OR site:smithsonianmag.com OR site:nationalgeographic.com OR site:atlasobscura.com")
+        if t.get("yt_url") and not url_exists(t["yt_url"]):
+            print(f"  ⚠ Dead YouTube URL for '{t['title']}' — replacing with search")
+            t["yt_url"] = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(t["title"])
+    return topics
+
+
 def fetch_topics() -> list[dict]:
     client = anthropic.Anthropic()
     response = client.messages.create(
@@ -179,6 +200,8 @@ def pushover_notify(message: str, url: str) -> None:
 def main() -> None:
     print("Fetching today's 5 curiosities…\n")
     topics = fetch_topics()
+    print("Validating URLs…")
+    topics = validate_urls(topics)
 
     for i, t in enumerate(topics, 1):
         print(f"{i}. {t['title']}\n   {t['why']}\n   YT: {t.get('yt_url')}\n   Article: {t.get('article_url')}\n")
