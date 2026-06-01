@@ -27,38 +27,23 @@ unusual linguistics, forgotten inventions, extreme geography, etc.
 For each topic return:
 - A short punchy title (≤ 8 words)
 - One sentence explaining why it's interesting
-- A specific real YouTube video URL that you are confident exists and is about this topic
-- A specific real article URL from a quality source like BBC, Smithsonian, National Geographic,
-  Atlas Obscura, The Guardian, Scientific American, or similar — NO Wikipedia
 - A single relevant emoji
 
 Return ONLY valid JSON in this exact shape, nothing else:
 [
-  {{"title": "...", "why": "...", "yt_url": "https://www.youtube.com/watch?v=...", "article_url": "https://...", "emoji": "🌊"}},
+  {{"title": "...", "why": "...", "emoji": "🌊"}},
   ...
 ]
 """.strip()
 
 
-def url_exists(url: str) -> bool:
-    try:
-        req = urllib.request.Request(url, method="HEAD")
-        req.add_header("User-Agent", "Mozilla/5.0")
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            return resp.status < 400
-    except Exception:
-        return False
-
-
-def validate_urls(topics: list[dict]) -> list[dict]:
-    for t in topics:
-        if t.get("article_url") and not url_exists(t["article_url"]):
-            print(f"  ⚠ Dead article URL for '{t['title']}' — replacing with search")
-            t["article_url"] = "https://www.google.com/search?q=" + urllib.parse.quote(t["title"] + " site:bbc.com OR site:smithsonianmag.com OR site:nationalgeographic.com OR site:atlasobscura.com")
-        if t.get("yt_url") and not url_exists(t["yt_url"]):
-            print(f"  ⚠ Dead YouTube URL for '{t['title']}' — replacing with search")
-            t["yt_url"] = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(t["title"])
-    return topics
+def search_urls(title: str) -> tuple[str, str]:
+    q = urllib.parse.quote(title)
+    yt  = f"https://www.youtube.com/results?search_query={q}"
+    art = "https://www.google.com/search?q=" + urllib.parse.quote(
+        f"{title} site:bbc.com OR site:smithsonianmag.com OR site:nationalgeographic.com OR site:atlasobscura.com OR site:theguardian.com OR site:scientificamerican.com"
+    )
+    return yt, art
 
 
 def fetch_topics() -> list[dict]:
@@ -90,8 +75,7 @@ def build_html(topics: list[dict], date_str: str) -> str:
     for i, t in enumerate(topics, 1):
         emoji    = t.get("emoji", "🔍")
         gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
-        yt_url   = t.get("yt_url") or "https://www.google.com/search?q=" + urllib.parse.quote(t["title"] + " youtube")
-        art_url  = t.get("article_url") or "https://www.google.com/search?q=" + urllib.parse.quote(t["title"])
+        yt_url, art_url = search_urls(t["title"])
 
         cards += f"""
         <div class="card">
@@ -200,11 +184,9 @@ def pushover_notify(message: str, url: str) -> None:
 def main() -> None:
     print("Fetching today's 5 curiosities…\n")
     topics = fetch_topics()
-    print("Validating URLs…")
-    topics = validate_urls(topics)
 
     for i, t in enumerate(topics, 1):
-        print(f"{i}. {t['title']}\n   {t['why']}\n   YT: {t.get('yt_url')}\n   Article: {t.get('article_url')}\n")
+        print(f"{i}. {t['title']}\n   {t['why']}\n")
 
     date_str = datetime.utcnow().strftime("%B %d, %Y")
     html = build_html(topics, date_str)
