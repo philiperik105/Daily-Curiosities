@@ -27,20 +27,20 @@ unusual linguistics, forgotten inventions, extreme geography, etc.
 For each topic return:
 - A short punchy title (≤ 8 words)
 - One sentence explaining why it's interesting
+- A short YouTube search query (2-4 words) that will find good videos about this topic
 - A single relevant emoji
 
 Return ONLY valid JSON in this exact shape, nothing else:
 [
-  {{"title": "...", "why": "...", "emoji": "🌊"}},
+  {{"title": "...", "why": "...", "yt_query": "tardigrades survival", "emoji": "🌊"}},
   ...
 ]
 """.strip()
 
 
-def search_urls(title: str) -> tuple[str, str]:
-    q = urllib.parse.quote(title)
-    yt  = f"https://m.youtube.com/results?search_query={q}"
-    art = f"https://www.google.com/search?q={q}"
+def search_urls(title: str, yt_query: str) -> tuple[str, str]:
+    yt  = f"https://m.youtube.com/results?search_query={urllib.parse.quote(yt_query)}"
+    art = f"https://www.google.com/search?q={urllib.parse.quote(title)}"
     return yt, art
 
 
@@ -73,7 +73,7 @@ def build_html(topics: list[dict], date_str: str) -> str:
     for i, t in enumerate(topics, 1):
         emoji    = t.get("emoji", "🔍")
         gradient = GRADIENTS[(i - 1) % len(GRADIENTS)]
-        yt_url, art_url = search_urls(t["title"])
+        yt_url, art_url = search_urls(t["title"], t.get("yt_query", t["title"]))
 
         cards += f"""
         <div class="card">
